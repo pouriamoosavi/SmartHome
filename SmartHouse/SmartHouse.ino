@@ -27,32 +27,40 @@ const uint8_t LIGHT_MENU = 3;
 String inputMessage;
 
 boolean isInMainMenu;
-int8_t desiredMenu = 0;
-int8_t desiredTemp = 0;
-int8_t desiredHumi = 0;
-int8_t desiredLight = 0;
+int desiredMenu = 0;
+int desiredTemp = 0;
+int desiredHumi = 0;
+int desiredLight = 0;
 
-int8_t desiredTempTemp = 0;
-int8_t desiredHumiTemp = 0;
-int8_t desiredLightTemp = 0;
+int desiredTempTemp = 0;
+int desiredHumiTemp = 0;
+int desiredLightTemp = 0;
 
-int8_t* mkpPointTo;
+int* mkpPointTo;
 boolean mkpIsReady;
 
-const int COOLER_ENGINE_DELAY = 1000;
+const int COOLER_ENGINE_DELAY = 15000;
+const int WATERING_DURATION = 20000;
+const int CHECK_FOR_HUMI_DELAY = 30000;
 
 unsigned long coolerPumpStart = 0;
 uint8_t coolerPumpOn = 0;
 uint8_t coolerEngineOn = 0;
 uint8_t coolerEngineFastOn = 0;
 uint8_t heaterOn = 0;
+unsigned long waterStart = 0;
+unsigned long waterEnd = 0;
+uint8_t waterOn = 0;
 
 const uint8_t COOLER_PUMP_PIN = 5;
 const uint8_t COOLER_ENGINE_PIN = 4;
 const uint8_t COOLER_ENGINE_FAST_PIN = 3;
 const uint8_t HEATER_PIN = 2;
+const uint8_t WATER_PUMP_PIN = 6;
 
 const uint8_t TEMP_SENSOR_PIN = 3;
+const uint8_t HUMI_SENSOR_PIN = 2;
+const uint8_t LIGHT_SENSOR_PIN = 1;
 
 void setup() {
   Serial.begin(9600);
@@ -66,12 +74,13 @@ void setup() {
   pinMode(COOLER_ENGINE_PIN, OUTPUT);
   pinMode(COOLER_ENGINE_FAST_PIN, OUTPUT);
   pinMode(HEATER_PIN, OUTPUT);
+  pinMode(WATER_PUMP_PIN, OUTPUT);
   
   resetState();
 }
 
 void loop() {
-  
+
   if(isInMainMenu) {
     getMenuFromMkp();
 
@@ -83,7 +92,7 @@ void loop() {
         mkpPointTo = &desiredTempTemp;
         
       } else if (desiredMenu == HUMI_MENU) {
-        inputMessage = "Enter humidity: (" + String(desiredHumi) + ")";
+        inputMessage = "Enter humi: (" + String(desiredHumi) + ")";
         mkpPointTo = &desiredHumiTemp;
         
       } else if (desiredMenu == LIGHT_MENU) {
@@ -107,9 +116,9 @@ void loop() {
   }
 
   checkTemp();
+  checkHumi();
 
   delay(10);
-  
 }
 
 void getIntFromMkp(boolean echo) {
@@ -223,4 +232,19 @@ void checkTemp() {
   digitalWrite(COOLER_ENGINE_PIN, coolerEngineOn);
   digitalWrite(COOLER_ENGINE_FAST_PIN, coolerEngineFastOn);
   digitalWrite(HEATER_PIN, heaterOn);
+}
+
+void checkHumi() {
+  const int humiNow = analogRead(HUMI_SENSOR_PIN);
+  if(!waterOn && (millis() - waterEnd > CHECK_FOR_HUMI_DELAY) && humiNow < desiredHumi) {
+    waterOn = 1;
+    waterStart = millis();
+  }
+
+  if(waterOn && (millis() - waterStart > WATERING_DURATION)) {
+    waterOn = 0;
+    waterEnd = millis();
+  }
+
+  digitalWrite(WATER_PUMP_PIN, waterOn);
 }
